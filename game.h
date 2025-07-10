@@ -9,7 +9,7 @@
 #define SCREEN_HEIGHT 700
 #define BLOCK_SIZE 20
 #define UI_HEIGHT 100
-#define MAX_BOMBS 10
+#define MAX_BOMBS 200
 #define MAX_ENEMIES 10
 #define BOMB_TIMER 3
 #define EXPLOSION_RANGE 3
@@ -17,11 +17,12 @@
 // tipos de blocos
 typedef enum {
     EMPTY = ' ',
-    WALL = '#',
-    BREAKABLE_WALL = '=',
-    BOX = 'C',
-    KEY = 'K',
-    BOMB = 'B',
+    WALL = 'W',
+    BREAKABLE_WALL = 'D',
+    BOX = 'K',
+    BOX_KEYLESS = 'B',
+    KEY = '=',
+    BOMB = 'G',
     EXPLOSION = '*'
 } BlockType;
 
@@ -52,7 +53,9 @@ typedef struct {
     Position pos;
     int direction;
     double last_move_time;
+    double last_walk_time;
     bool is_alive;
+    
 } Enemy; //variáveis dos inimigos que uso pra saber sobre eles
 
 typedef struct {
@@ -79,6 +82,7 @@ typedef struct {
 
     bool in_menu;
     bool game_over;
+    bool game_won;
     bool level_complete;
 
     Texture2D playerTexture;

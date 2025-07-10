@@ -1,7 +1,8 @@
 #include "game.h"
 #include <stdio.h>
+#include <stdlib.h>
 
-// Função para processar as entradas do jogador
+// função para processar as entradas do jogador
 void process_input(GameState *game) {
     if (game->in_menu) {
         if (IsKeyPressed(KEY_N)) {
@@ -27,7 +28,7 @@ void process_input(GameState *game) {
             game->in_menu = false;
         }
         else if (IsKeyPressed(KEY_Q)) {
-            game->game_over = true;
+            CloseWindow();
         }
         else if (IsKeyPressed(KEY_V)) {
             game->in_menu = false;
@@ -47,5 +48,13 @@ void process_input(GameState *game) {
             init_game(game);
             game->in_menu = true;
         }
+        if (game->game_won) {
+            if (IsKeyPressed(KEY_Q)) {
+                CloseWindow();
+                exit(0);
+            }
+            return;
+        }
+
     }
 }

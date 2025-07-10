@@ -1,25 +1,30 @@
-############################################################
-#P    =  =     K    =      =   C   =   K      =   C     E  #
-# ####   ######   ####   ######   ####   ######   ######  #
-#=     =     =     C   =     =   K   =     C   =      =   #
-# ####   ######   ####   ######   ####   ######   ######  #
-#=   C =  K  =   =     =   C   =     =   K   =   C     =  #
-# ####   ######   ####   ######   ####   ######   ######  #
-#=     =     =   K   =     =   C     =     =     =     =  #
-# ####   ######   ####   ######   ####   ######   ######  #
-#        C     =   E       =   C     =   K     =     C    #
-############################################################
-#                                                          #
-#                                                          #
-#                                                          #
-#                                                          #
-#                                                          #
-#                                                          #
-#                                                          #
-#                                                          #
-#                                                          #
-#                                                          #
-#                                                          #
-#                                                          #
-#                                                          #
-############################################################
+WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW
+W                E                                         W
+W                                                          W
+W   D                                            K         W
+W   WWWWWW                                                 W
+W        W                    J                            W
+W   BK   W                               E                 W
+W   WWWWWW                                                 W
+W                                                          W
+W                                                          W
+W                 WWWWWWWWWWWWWWWWWWWWWW                   W
+W                 W                                    B   W
+W                 W   K                                    W
+W    E            W                                        W
+W                 WWWWWWWWWWWWWWWWWWWWWW                   W
+W                                                          W
+W                                                          W
+W                                                          W
+W    WWWWWWWWWW                               B            W
+W    W        D                                            W
+W    W   K    D       B                                    W
+W    W        D                      E                     W
+W    WWWWWWWWWW                                            W
+W                                                   K      W
+W                                                          W
+W              D                                           W
+W                                                          W
+W                                                 E        W
+W                                                          W
+WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW

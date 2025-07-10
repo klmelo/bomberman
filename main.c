@@ -5,7 +5,8 @@
 #define SCREEN_WIDTH 1200
 #define SCREEN_HEIGHT 700
 
-int main() {
+int main()
+{
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Bomberman");
     SetTargetFPS(60);
 
@@ -22,17 +23,21 @@ int main() {
     game.bombTexture = LoadTexture("sprites/bomb.png");
     game.explosionTexture = LoadTexture("sprites/explosion.png");
 
-    while (!WindowShouldClose()) {
+    while (!WindowShouldClose())
+    {
         process_input(&game);
         update_game(&game);
 
         BeginDrawing();
-            ClearBackground(RAYWHITE);
-            if (game.in_menu) {
-                draw_menu(&game);
-            } else {
-                draw_game(&game);
-            }
+        ClearBackground(RAYWHITE);
+        if (game.in_menu)
+        {
+            draw_menu(&game);
+        }
+        else
+        {
+            draw_game(&game);
+        }
         EndDrawing();
     }
 

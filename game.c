@@ -24,6 +24,7 @@ void init_game(GameState *game) {
     game->level_complete = false;
     game->explosions = NULL;
     game->explosion_count = 0;
+    game->game_won = false;
 
     game->player.lives = 3;
     game->player.bombs = 3;
@@ -68,7 +69,7 @@ void load_level(GameState *game, const char *filename) {
     game->cols = 0;
     game->enemy_count = 0;
 
-    // Conta linhas, colunas máximas e inimigos
+    // conta linhas, colunas máximas e inimigos
     while (fgets(line, sizeof(line), file)) {
         int len = strlen(line);
         if (line[len - 1] == '\n') len--;
@@ -101,7 +102,7 @@ void load_level(GameState *game, const char *filename) {
         for (int j = 0; j < game->cols; j++) {
             if (j < len) {
                 char c = line[j];
-                if (c == 'P') {
+                if (c == 'J') {
                     game->player.pos.x = j;
                     game->player.pos.y = i;
                     game->grid[i][j] = EMPTY;
@@ -114,6 +115,9 @@ void load_level(GameState *game, const char *filename) {
                     game->enemies[enemy_index].is_alive = true;
                     enemy_index++;
                     game->grid[i][j] = EMPTY;
+                    game->enemies[enemy_index].last_move_time = GetTime();
+                    game->enemies[enemy_index].last_walk_time = GetTime();
+
                 }
                 else {
                     game->grid[i][j] = c;
@@ -162,9 +166,30 @@ void unload_level(GameState *game) {
     game->explosion_count = 0;
 }
 
+void cleanup_exploded_bombs(GameState *game) {
+    int write_index = 0;
+    for (int i = 0; i < game->bomb_count; i++) {
+        if (!game->bombs[i].exploded) {
+            if (write_index != i) {
+                game->bombs[write_index] = game->bombs[i];
+            }
+            write_index++;
+        }
+    }
+
+    game->bomb_count = write_index;
+    game->bombs = realloc(game->bombs, game->bomb_count * sizeof(Bomb));
+    cleanup_exploded_bombs(game);
+}
 
 // desenha o jogo na tela
 void draw_game(const GameState *game) {
+    if (game->game_won) {
+        DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, Fade(BLACK, 0.8f));
+        DrawText("YOU WIN!", SCREEN_WIDTH / 2 - 100, SCREEN_HEIGHT / 2 - 20, 50, GOLD);
+        DrawText("Pressione Q para sair", SCREEN_WIDTH / 2 - 120, SCREEN_HEIGHT / 2 + 40, 20, WHITE);
+    return;
+}
     for (int i = 0; i < game->rows; i++) {
         for (int j = 0; j < game->cols; j++) {
             switch (game->grid[i][j]) {
@@ -175,6 +200,9 @@ void draw_game(const GameState *game) {
                     DrawTexture(game->breakableWallTexture, j * BLOCK_SIZE, i * BLOCK_SIZE, WHITE);
                     break;
                 case BOX:
+                    DrawTexture(game->boxTexture, j * BLOCK_SIZE, i * BLOCK_SIZE, WHITE);
+                    break;
+                case BOX_KEYLESS:
                     DrawTexture(game->boxTexture, j * BLOCK_SIZE, i * BLOCK_SIZE, WHITE);
                     break;
                 case KEY:
@@ -217,11 +245,14 @@ void draw_game(const GameState *game) {
     DrawText(TextFormat("Nivel: %d", game->current_level), 400, SCREEN_HEIGHT - UI_HEIGHT + 20, 20, BLACK);
 
     if (game->game_over) {
+        DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, Fade(BLACK, 0.8f));
         DrawText("GAME OVER", SCREEN_WIDTH/2 - 100, SCREEN_HEIGHT/2 - 20, 40, RED);
         DrawText("Pressione N para novo jogo ou Q para sair", SCREEN_WIDTH/2 - 200, SCREEN_HEIGHT/2 + 30, 20, BLACK);
     }
 
+
     if (game->level_complete) {
+        DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, Fade(BLACK, 0.8f));
         DrawText("NIVEL COMPLETO!", SCREEN_WIDTH/2 - 150, SCREEN_HEIGHT/2 - 20, 40, GREEN);
         DrawText("Preparando proximo nivel...", SCREEN_WIDTH/2 - 150, SCREEN_HEIGHT/2 + 30, 20, BLACK);
     }
@@ -364,49 +395,68 @@ void plant_bomb(GameState *game) {
 
 
 // atualiza movimentação dos inimigos
+#define ENEMY_MOVE_INTERVAL 0.5     // anda a cada 0.5 segundos (ajuste para mais/menos)
+#define ENEMY_DIRECTION_DURATION 5.0 // mantém direção por 5 segundos
+
 void update_enemies(GameState *game) {
     double current_time = GetTime();
 
     for (int i = 0; i < game->enemy_count; i++) {
         if (!game->enemies[i].is_alive) continue;
 
-        if (current_time - game->enemies[i].last_move_time > 0.5) {
-            int dx = 0, dy = 0;
-            switch (game->enemies[i].direction) {
-                case 0: dy = -1; break;
-                case 1: dx = 1; break;
-                case 2: dy = 1; break;
-                case 3: dx = -1; break;
-            }
+        Enemy *enemy = &game->enemies[i];
 
-            int new_x = game->enemies[i].pos.x + dx;
-            int new_y = game->enemies[i].pos.y + dy;
+        // se passou 5 segundos, muda de direção aleatória
+        if (current_time - enemy->last_move_time >= ENEMY_DIRECTION_DURATION) {
+            enemy->direction = GetRandomValue(0, 3);
+            enemy->last_move_time = current_time;
+        }
 
-            if (is_valid_position(game, new_x, new_y)) {
-                if (!is_obstacle(game, new_x, new_y) && !is_position_occupied_by_bomb(game, new_x, new_y)) {
-                    bool free_pos = true;
-                    for (int j = 0; j < game->enemy_count; j++) {
-                        if (i != j && game->enemies[j].is_alive &&
-                            game->enemies[j].pos.x == new_x &&
-                            game->enemies[j].pos.y == new_y) {
-                            free_pos = false;
-                            break;
-                        }
-                    }
-                    if (free_pos) {
-                        game->enemies[i].pos.x = new_x;
-                        game->enemies[i].pos.y = new_y;
-                        game->enemies[i].last_move_time = current_time;
-                        continue;
-                    }
+        // só tenta andar se passou o tempo da "velocidade"
+        if (current_time - enemy->last_walk_time < ENEMY_MOVE_INTERVAL) continue;
+
+        enemy->last_walk_time = current_time;
+
+        int dx = 0, dy = 0;
+        switch (enemy->direction) {
+            case 0: dy = -1; break; // cima
+            case 1: dx = 1; break;  // direita
+            case 2: dy = 1; break;  // baixo
+            case 3: dx = -1; break; // esquerda
+        }
+
+        int new_x = enemy->pos.x + dx;
+        int new_y = enemy->pos.y + dy;
+
+        if (is_valid_position(game, new_x, new_y) &&
+            !is_obstacle(game, new_x, new_y) &&
+            !is_position_occupied_by_bomb(game, new_x, new_y)) {
+
+            // verifica se não tem outro inimigo na posição
+            bool free_pos = true;
+            for (int j = 0; j < game->enemy_count; j++) {
+                if (i != j && game->enemies[j].is_alive &&
+                    game->enemies[j].pos.x == new_x &&
+                    game->enemies[j].pos.y == new_y) {
+                    free_pos = false;
+                    break;
                 }
             }
 
-            game->enemies[i].direction = GetRandomValue(0, 3);
-            game->enemies[i].last_move_time = current_time;
+            if (free_pos) {
+                enemy->pos.x = new_x;
+                enemy->pos.y = new_y;
+                continue;
+            }
         }
+
+        // se não conseguiu andar (obstáculo ou outro inimigo), muda de direção agora
+        enemy->direction = GetRandomValue(0, 3);
+        enemy->last_move_time = current_time;  // reinicia o tempo de direção
     }
 }
+
+
 
 
 // atualiza bombas, explodindo as que estão no tempo
@@ -428,7 +478,7 @@ bool is_valid_position(const GameState *game, int x, int y) {
 // verifica se a posição tem obstáculo (parede, caixa, bomba)
 bool is_obstacle(const GameState *game, int x, int y) {
     char c = game->grid[y][x];
-    return (c == WALL || c == BREAKABLE_WALL || c == BOX);
+    return (c == WALL || c == BREAKABLE_WALL || c == BOX || c == BOX_KEYLESS);
 }
 
 // verifica se já existe bomba na posição (x,y)
@@ -452,6 +502,9 @@ void check_collisions(GameState *game) {
             game->enemies[i].pos.y == game->player.pos.y) {
             
             game->player.lives--;
+            if (game->player.score - 100 < 0) {
+                game->player.score = 0;
+            } else game->player.score -= 100;
             if (game->player.lives <= 0) {
                 game->player.is_alive = false;
                 game->game_over = true;
@@ -472,6 +525,9 @@ void check_collisions(GameState *game) {
             game->explosions[i].pos.y == game->player.pos.y) {
             
             game->player.lives--;
+            if (game->player.score - 100 < 0) {
+                game->player.score = 0;
+            } else game->player.score -= 100;
             if (game->player.lives <= 0) {
                 game->player.is_alive = false;
                 game->game_over = true;
@@ -490,11 +546,20 @@ void next_level(GameState *game) {
     game->current_level++;
     char filename[20];
     sprintf(filename, "mapa%d.txt", game->current_level);
-    load_level(game, filename);
 
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        // não existe próximo nível: jogador venceu
+        game->game_won = true;
+        return;
+    }
+    fclose(file);
+
+    load_level(game, filename);
     game->player.keys_collected = 0;
     game->level_complete = false;
 }
+
 
 // salva o estado do jogo em arquivo
 void save_game(const GameState *game) {
@@ -604,45 +669,108 @@ void explode_bomb(GameState *game, int bomb_index) {
     game->grid[cy][cx] = EMPTY;
     add_explosion(game, cx, cy);
 
-    // explode para cima
-    for (int y = cy - 1; y >= cy - range && y >= 0; y--) {
-        if (game->grid[y][cx] == WALL) break;
-        add_explosion(game, cx, y);
-        if (game->grid[y][cx] == BREAKABLE_WALL || game->grid[y][cx] == BOX) {
+// explode para cima
+for (int y = cy - 1; y >= cy - range && y >= 0; y--) {
+    if (game->grid[y][cx] == WALL) break;
+    add_explosion(game, cx, y);
+
+    if (game->grid[y][cx] == BOX_KEYLESS) {
+        game->player.score +=10;
+        game->grid[y][cx] = EMPTY;
+        break;
+    } else if (game->grid[y][cx] == BREAKABLE_WALL) {
+        game->player.score += 10;
+        game->grid[y][cx] = EMPTY;
+        break;
+    } else if (game->grid[y][cx] == BOX) {
+        if (GetRandomValue(0, 99) < 100) {
+            game->grid[y][cx] = KEY;
+            game->keys_remaining++;
+        } else {
             game->grid[y][cx] = EMPTY;
-            break;
         }
+        game->player.score += 10;
+        break;
     }
+}
 
-    // explode para baixo
-    for (int y = cy + 1; y <= cy + range && y < game->rows; y++) {
-        if (game->grid[y][cx] == WALL) break;
-        add_explosion(game, cx, y);
-        if (game->grid[y][cx] == BREAKABLE_WALL || game->grid[y][cx] == BOX) {
+// explode para baixo
+for (int y = cy + 1; y <= cy + range && y < game->rows; y++) {
+    
+        if (game->grid[y][cx] == BOX_KEYLESS) {
+        game->player.score +=10;
+        game->grid[y][cx] = EMPTY;
+        break;
+    } else
+    if (game->grid[y][cx] == WALL) break;
+    add_explosion(game, cx, y);
+
+    if (game->grid[y][cx] == BREAKABLE_WALL) {
+        game->grid[y][cx] = EMPTY;
+        break;
+    } else if (game->grid[y][cx] == BOX) {
+        if (GetRandomValue(0, 99) < 100) {
+            game->grid[y][cx] = KEY;
+            game->keys_remaining++;
+        } else {
             game->grid[y][cx] = EMPTY;
-            break;
         }
+        game->player.score += 10;
+        break;
     }
+}
 
-    // explode para esquerda
-    for (int x = cx - 1; x >= cx - range && x >= 0; x--) {
-        if (game->grid[cy][x] == WALL) break;
-        add_explosion(game, x, cy);
-        if (game->grid[cy][x] == BREAKABLE_WALL || game->grid[cy][x] == BOX) {
-            game->grid[cy][x] = EMPTY;
-            break;
-        }
-    }
+// explode para esquerda
+for (int x = cx - 1; x >= cx - range && x >= 0; x--) {
+    if (game->grid[cy][x] == WALL) break;
+    add_explosion(game, x, cy);
 
-    // explode para direita
-    for (int x = cx + 1; x <= cx + range && x < game->cols; x++) {
-        if (game->grid[cy][x] == WALL) break;
-        add_explosion(game, x, cy);
-        if (game->grid[cy][x] == BREAKABLE_WALL || game->grid[cy][x] == BOX) {
+
+    if (game->grid[cy][x] == BOX_KEYLESS) {
+        game->player.score +=10;
+        game->grid[cy][x] = EMPTY;
+        break;
+    } else
+    if (game->grid[cy][x] == BREAKABLE_WALL) {
+        game->grid[cy][x] = EMPTY;
+        break;
+    } else if (game->grid[cy][x] == BOX) {
+        if (GetRandomValue(0, 99) < 100) {
+            game->grid[cy][x] = KEY;
+            game->keys_remaining++;
+        } else {
             game->grid[cy][x] = EMPTY;
-            break;
         }
+        game->player.score += 10;
+        break;
     }
+}
+
+// explode para direita
+for (int x = cx + 1; x <= cx + range && x < game->cols; x++) {
+    if (game->grid[cy][x] == WALL) break;
+    add_explosion(game, x, cy);
+
+        if (game->grid[cy][x] == BOX_KEYLESS) {
+        game->player.score +=10;
+        game->grid[cy][x] = EMPTY;
+        break;
+    } else
+    if (game->grid[cy][x] == BREAKABLE_WALL) {
+        game->grid[cy][x] = EMPTY;
+        break;
+    } else if (game->grid[cy][x] == BOX) {
+        if (GetRandomValue(0, 99) < 100) {
+            game->grid[cy][x] = KEY;
+            game->keys_remaining++;
+        } else {
+            game->grid[cy][x] = EMPTY;
+        }
+        game->player.score += 10;
+        break;
+    }
+}
+
 
     // mata inimigos atingidos pela explosão
     for (int i = 0; i < game->enemy_count; i++) {
@@ -651,7 +779,7 @@ void explode_bomb(GameState *game, int bomb_index) {
             if (game->enemies[i].pos.x == game->explosions[j].pos.x &&
                 game->enemies[i].pos.y == game->explosions[j].pos.y) {
                 game->enemies[i].is_alive = false;
-                game->player.score += 50;
+                game->player.score += 20;
             }
         }
     }
