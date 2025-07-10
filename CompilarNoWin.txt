@@ -1,0 +1,1 @@
+gcc -o bomberman.exe main.c game.c input.c -lraylib -lopengl32 -lgdi32 -lwinmm
